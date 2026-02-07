@@ -1,9 +1,14 @@
 import './App.css'
+import Header from './components/Header/Header'
+import Footer from './components/Footer/Footer'
+import ReportComplete from './pages/ReportComplete/ReportComplete'
 
 function App() {
   return (
     <div className="App">
-      {/* ここから書き始めてください */}
+      <Header />
+      <ReportComplete />
+      <Footer />
     </div>
   )
 }

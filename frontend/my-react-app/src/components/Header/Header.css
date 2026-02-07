@@ -1,0 +1,22 @@
+.header {
+  /* ヘッダー全体のスタイル */
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 2rem;
+  background: white;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.header-left {
+  /* ロゴエリア */
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.header-nav {
+  /* ナビゲーションメニュー */
+  display: flex;
+  gap: 2rem;
+}

@@ -1,0 +1,22 @@
+.footer {
+  /* フッター全体 */
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.5rem 2rem;
+  background: white;
+  border-top: 1px solid #e0e0e0;
+  margin-top: auto;
+}
+
+.footer-copyright {
+  /* コピーライトテキスト */
+  color: #666;
+  font-size: 0.875rem;
+}
+
+.footer-links {
+  /* リンクエリア */
+  display: flex;
+  gap: 1.5rem;
+}
