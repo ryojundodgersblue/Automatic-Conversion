@@ -20,3 +20,10 @@
   display: flex;
   gap: 2rem;
 }
+
+.header-left .header-logo {
+  /* 画像 */
+  display: flex;
+  width: 40px;
+  height: 40px;
+}
