@@ -29,7 +29,6 @@ function ReportComplete() {
       const formData = new FormData()
       formData.append('file', file)
 
-      // TODO: バックエンドのエンドポイントができたら、URLを変更してください
       const response = await fetch('/api/upload', {
         method: 'POST',
         body: formData,
