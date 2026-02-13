@@ -2,9 +2,6 @@ import re
 
 import pdfplumber
 
-pdf_path = "/Users/ryoya.fujioka/Documents/doc/tests/testData/報告式決算報告書-202410-202513-260110173437.pdf"
-
-
 # --- 1. 貸借対照表 (BalanceSheet) ---
 BALANCE_SHEET_KEYS = {
     "cash": ["現金及び預金", "現金及預金", "現金預金", "現預金", "現金"],
@@ -135,49 +132,60 @@ STATEMENT_KEYS = {
     "end_total_equity": ["株主資本合計当期末残高", "純資産期末合計"],
 }
 
-with pdfplumber.open(pdf_path) as pdf:
-    current_section = None
-    sections = {"bs": "", "pl": "", "cr": "", "sa": ""}
-
-    for page in pdf.pages:
-        text = page.extract_text()
-        clean_text = text.replace(" ", "")
-
-        # タイトルでセクション判定
-        if "貸借対照表" in clean_text:
-            current_section = "bs"
-        elif "損益計算書" in clean_text:
-            current_section = "pl"
-        elif "完成工事原価報告書" in clean_text:
-            current_section = "cr"
-        elif "変動計算書" in clean_text:
-            current_section = "sa"
-
-        if current_section:
-            sections[current_section] += text + "\n"
+# ToDoテスト用
+file_path = "/Users/ryoya.fujioka/Documents/doc/tests/testData/報告式決算報告書-202410-202513-260110173437.pdf"
 
 
-def extract_values(lines, keys_dict):
-    result = {}
-    for line in lines:
-        clean = line.replace(" ", "")
-        item_name = re.sub(r"[\d,]+", "", clean)
-        for field, keywords in keys_dict.items():
-            for keyword in keywords:
-                if keyword == item_name:
-                    amounts = re.findall(r"[\d,]+", line)
-                    if amounts:
-                        result[field] = int(amounts[0].replace(",", ""))
-    return result
+def parse_pdf(file_path):
+
+    with pdfplumber.open(file_path) as pdf:
+        current_section = None
+        sections = {"bs": "", "pl": "", "cr": "", "sa": ""}
+
+        for page in pdf.pages:
+            text = page.extract_text()
+            clean_text = text.replace(" ", "")
+
+            # タイトルでセクション判定
+            if "貸借対照表" in clean_text:
+                current_section = "bs"
+            elif "損益計算書" in clean_text:
+                current_section = "pl"
+            elif "完成工事原価報告書" in clean_text:
+                current_section = "cr"
+            elif "変動計算書" in clean_text:
+                current_section = "sa"
+
+            if current_section:
+                sections[current_section] += text + "\n"
+
+    def extract_values(lines, keys_dict):
+        result = {}
+        for line in lines:
+            clean = line.replace(" ", "")
+            item_name = re.sub(r"[\d,]+", "", clean)
+            for field, keywords in keys_dict.items():
+                for keyword in keywords:
+                    if keyword == item_name:
+                        amounts = re.findall(r"[\d,]+", line)
+                        if amounts:
+                            value = int(amounts[0].replace(",", ""))
+                            if "" in clean:
+                                value = value * -1
+                            result[field] = value
+        return result
+
+    bs_result = extract_values(sections["bs"].split("\n"), BALANCE_SHEET_KEYS)
+    pl_result = extract_values(sections["pl"].split("\n"), PROFIT_AND_LOSS_KEYS)
+    cr_result = extract_values(sections["cr"].split("\n"), COST_REPORT_KEYS)
+
+    return bs_result, pl_result, cr_result
 
 
-bs_result = extract_values(sections["bs"].split("\n"), BALANCE_SHEET_KEYS)
-pl_result = extract_values(sections["pl"].split("\n"), PROFIT_AND_LOSS_KEYS)
-cr_result = extract_values(sections["cr"].split("\n"), COST_REPORT_KEYS)
-
-print("=== BalanceSheet ===")
-print(bs_result)
-print("=== ProfitAndLoss ===")
-print(pl_result)
-print("=== CostReport ===")
-print(cr_result)
+# ToDOテスト用
+if __name__ == "__main__":
+    file_path = "/Users/ryoya.fujioka/Documents/doc/tests/testData/報告式決算報告書-202410-202513-260110173437.pdf"
+    bs, pl, cr = parse_pdf(file_path)
+    print(bs)
+    print(pl)
+    print(cr)
