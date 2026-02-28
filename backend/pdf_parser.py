@@ -1,3 +1,9 @@
+"""PDF 解析モジュール — 確定申告書 PDF からデータを抽出する。
+
+pdfplumber を使って PDF テキストを読み取り、
+貸借対照表・損益計算書・完成工事原価報告書のデータを dict で返す。
+"""
+
 import re
 
 import pdfplumber
@@ -39,6 +45,8 @@ BALANCE_SHEET_KEYS = {
     "total_fixed_liabilities": ["固定負債合計", "固定負債計"],
     "total_liabilities": ["負債合計", "負債計"],
     "capital": ["資本金", "元入金"],
+    "other_retained_earnings": ["その他利益剰余金"],
+    "carried_forward_earnings": ["繰越利益剰余金"],
     "retained_earnings": ["利益剰余金合計", "利益剰余金", "利益剰余"],
     "total_equity": ["株主資本合計", "株主資本計"],
     "total_net_assets": ["純資産合計", "純資産計"],
@@ -132,11 +140,9 @@ STATEMENT_KEYS = {
     "end_total_equity": ["株主資本合計当期末残高", "純資産期末合計"],
 }
 
-# ToDoテスト用
-file_path = "/Users/ryoya.fujioka/Documents/doc/tests/testData/報告式決算報告書-202410-202513-260110173437.pdf"
-
 
 def parse_pdf(file_path):
+    """PDF ファイルを解析し、貸借対照表・損益計算書・原価報告書のデータを返す。"""
 
     with pdfplumber.open(file_path) as pdf:
         current_section = None
@@ -163,14 +169,14 @@ def parse_pdf(file_path):
         result = {}
         for line in lines:
             clean = line.replace(" ", "")
-            item_name = re.sub(r"[\d,]+", "", clean)
+            item_name = re.sub(r"[\d,]+", "", clean)
             for field, keywords in keys_dict.items():
                 for keyword in keywords:
                     if keyword == item_name:
                         amounts = re.findall(r"[\d,]+", line)
                         if amounts:
                             value = int(amounts[0].replace(",", ""))
-                            if "" in clean:
+                            if "△" in clean:
                                 value = value * -1
                             result[field] = value
         return result
@@ -180,12 +186,3 @@ def parse_pdf(file_path):
     cr_result = extract_values(sections["cr"].split("\n"), COST_REPORT_KEYS)
 
     return bs_result, pl_result, cr_result
-
-
-# ToDOテスト用
-if __name__ == "__main__":
-    file_path = "/Users/ryoya.fujioka/Documents/doc/tests/testData/報告式決算報告書-202410-202513-260110173437.pdf"
-    bs, pl, cr = parse_pdf(file_path)
-    print(bs)
-    print(pl)
-    print(cr)

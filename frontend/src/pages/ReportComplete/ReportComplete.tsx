@@ -16,7 +16,6 @@ function ReportComplete() {
     if (!file) return
 
     setSelectedFile(file)
-    console.log('選択されたファイル:', file.name)
 
     // バックエンドにファイルをアップロード
     await uploadFile(file)
@@ -35,11 +34,30 @@ function ReportComplete() {
       })
 
       if (response.ok) {
-        const result = await response.json()
-        console.log('アップロード成功:', result)
-        // 成功時の処理（例：結果ページへの遷移など）
+        // レスポンスをBlobとして取得し、Excelをダウンロード
+        const blob = await response.blob()
+        const url = window.URL.createObjectURL(blob)
+        const a = document.createElement('a')
+
+        // ファイル名をレスポンスヘッダーから取得、なければデフォルト名
+        const disposition = response.headers.get('content-disposition')
+        let filename = '報告書.xlsx'
+        if (disposition) {
+          const match = disposition.match(/filename\*?=(?:UTF-8'')?([^;]+)/)
+          if (match) {
+            filename = decodeURIComponent(match[1].replace(/"/g, ''))
+          }
+        }
+
+        a.href = url
+        a.download = filename
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        window.URL.revokeObjectURL(url)
       } else {
-        console.error('アップロード失敗:', response.statusText)
+        const error = await response.json()
+        console.error('アップロード失敗:', error)
         alert('ファイルのアップロードに失敗しました')
       }
     } catch (error) {
@@ -73,7 +91,7 @@ function ReportComplete() {
           onClick={handleClick}
           disabled={isUploading}
         >
-          {isUploading ? 'アップロード中...' : selectedFile ? selectedFile.name : 'ファイルを選択'}
+          {isUploading ? '変換中...' : selectedFile ? selectedFile.name : 'PDFファイルを選択'}
         </button>
 
         <p className="note">処理時間: 約10〜30秒</p>

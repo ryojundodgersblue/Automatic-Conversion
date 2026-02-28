@@ -1,13 +1,17 @@
-import openpyxl
-from pdf_parser import parse_pdf
+"""Excel 書き込みモジュール — 解析データをテンプレートに転記する。
 
-TEMPLATE_PATH = (
-    "/Users/ryoya.fujioka/Documents/doc/backend/public/0_愛知県テンプレ.xlsx"
-)
-PDF_PATH = "/Users/ryoya.fujioka/Documents/doc/tests/testData/報告式決算報告書-202410-202513-260110173437.pdf"
+PDF から抽出した貸借対照表・損益計算書・原価報告書のデータを
+都道府県テンプレート Excel の各シートに書き込む。
+"""
+
+import os
+import tempfile
+
+import openpyxl
 
 
 def write_bs(wb, bs_data):
+    """貸借対照表データをシート１５(１)〜(３)に書き込む。"""
     ws1 = wb["１５ (１)"]
     ws2 = wb["１５（２）"]
     ws3 = wb["１５（３）"]
@@ -52,6 +56,7 @@ def write_bs(wb, bs_data):
     # --- シート3: 純資産 ---
     MAPPING_3 = {
         "capital": "AW4",
+        "carried_forward_earnings": "AM15",
         "retained_earnings": "AY16",
         "total_equity": "BK19",
         "total_net_assets": "BK26",
@@ -63,6 +68,7 @@ def write_bs(wb, bs_data):
 
 
 def write_pl(wb, pl_data):
+    """損益計算書データをシート１６(４)〜(５)に書き込む。"""
     ws4 = wb["１６（４）"]
     ws5 = wb["１６（５）"]
 
@@ -168,9 +174,11 @@ def write_pl(wb, pl_data):
     )  # 営業外費用合計
     ws5["AV15"] = (ws5["AI14"].value or 0) + (ws5["AI15"].value or 0)  # 特別利益合計
     ws5["AV18"] = (ws5["AI17"].value or 0) + (ws5["AI18"].value or 0)  # 特別損失合計
+    ws5["AX22"] = (ws5["AI21"].value or 0) + (ws5["AK22"].value or 0)  # 法人税等合計
 
 
 def write_cr(wb, cr_data):
+    """完成工事原価報告書データをシート１６(５)に書き込む。"""
     ws5 = wb["１６（５）"]
 
     A = cr_data.get("final_cost", 0)
@@ -185,10 +193,31 @@ def write_cr(wb, cr_data):
     ws5["BI37"] = A // 1000
 
 
-if __name__ == "__main__":
-    bs_data, pl_data, cr_data = parse_pdf(PDF_PATH)
-    wb = openpyxl.load_workbook(TEMPLATE_PATH)
+def write_sa(wb, bs_data, pl_data):
+    """株主資本等変動計算書データをシート１７(６)に書き込む。"""
+    ws6 = wb["１７（６）"]
+
+    # 貸借対照表から
+    ws6["N27"] = bs_data.get("capital", 0) // 1000  # 資本金
+    ws6["AX27"] = bs_data.get("carried_forward_earnings", 0) // 1000  # 繰越利益剰余金
+    ws6["BM27"] = bs_data.get("total_equity", 0) // 1000  # 株主資本合計
+
+    # 損益計算書から
+    ws6["AX18"] = pl_data.get("net_income", 0) // 1000  # 当期純利益金額
+
+
+def write_to_excel(template_path, bs_data, pl_data, cr_data):
+    """テンプレート Excel にデータを書き込み、一時ファイルのパスを返す。"""
+    wb = openpyxl.load_workbook(template_path)
+
     write_bs(wb, bs_data)
     write_pl(wb, pl_data)
-    wb.save("/Users/ryoya.fujioka/Downloads/test_output.xlsx")
-    print("保存完了！")
+    write_cr(wb, cr_data)
+    write_sa(wb, bs_data, pl_data)
+
+    # 一時ファイルに保存して返す
+    output_fd, output_path = tempfile.mkstemp(suffix=".xlsx")
+    os.close(output_fd)
+    wb.save(output_path)
+
+    return output_path

@@ -1,5 +1,5 @@
 import './Footer.css'
-import logo from '@/assets/ryojunLogo.png' ;
+import logo from '@/assets/ryojun-logo.png';
 
 function Footer() {
   return (
