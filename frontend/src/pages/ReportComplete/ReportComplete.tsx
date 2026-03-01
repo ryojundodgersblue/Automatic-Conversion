@@ -56,13 +56,14 @@ function ReportComplete() {
     setIsUploading(true);
     setErrorMessage(null);
 
-    // --- タイムアウト設定（AbortController で60秒制限） ---
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), UPLOAD_TIMEOUT_MS);
 
     try {
       const formData = new FormData();
       formData.append("file", file);
+
+      console.log("アップロード開始:", file.name, file.size, "bytes");
 
       const response = await fetch("/api/upload", {
         method: "POST",
@@ -71,19 +72,23 @@ function ReportComplete() {
       });
 
       clearTimeout(timeoutId);
+      console.log("レスポンス:", response.status, response.headers.get("content-type"));
 
       if (response.ok) {
-        // レスポンスをBlobとして取得し、Excelをダウンロード
-        const data = await response.blob();
-        const blob = new Blob([data], {
-          type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        });
-        const url = window.URL.createObjectURL(blob);
+        const blob = await response.blob();
+        console.log("Blob取得:", blob.size, "bytes, type:", blob.type);
+
+        if (blob.size === 0) {
+          setErrorMessage("サーバーからの応答が空です。再度お試しください。");
+          return;
+        }
 
         // ダウンロードファイル名: 元のPDF名 → _報告書.xlsx
         const baseName = file.name.replace(/\.pdf$/i, "");
         const downloadName = `${baseName}_報告書.xlsx`;
 
+        // ダウンロード実行
+        const url = window.URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
         a.download = downloadName;
@@ -91,37 +96,33 @@ function ReportComplete() {
         document.body.appendChild(a);
         a.click();
 
-        // ブラウザがダウンロードを開始するまで少し待ってからクリーンアップ
         setTimeout(() => {
           document.body.removeChild(a);
           window.URL.revokeObjectURL(url);
-        }, 1000);
+        }, 3000);
 
-        // アップロード完了後、inputを初期状態に戻す
+        console.log("ダウンロード開始:", downloadName);
+
         if (fileInputRef.current) fileInputRef.current.value = "";
         setErrorMessage(null);
       } else {
-        // --- ステータスコード別エラーメッセージ ---
+        const text = await response.text();
+        console.error("サーバーエラー:", response.status, text);
         const message = getErrorMessage(response.status);
         setErrorMessage(message);
-        console.error("アップロード失敗:", response.status, message);
       }
     } catch (error) {
       clearTimeout(timeoutId);
 
-      // --- エラー種別の判別 ---
       if (error instanceof DOMException && error.name === "AbortError") {
-        // タイムアウト
         setErrorMessage(
           "アップロードがタイムアウトしました。ネットワーク接続を確認してください。",
         );
       } else if (error instanceof TypeError) {
-        // ネットワークエラー（サーバー未起動等）
         setErrorMessage(
           "サーバーに接続できません。ネットワーク接続を確認してください。",
         );
       } else {
-        // その他のエラー
         setErrorMessage(
           "ファイルのアップロード中に予期しないエラーが発生しました。",
         );
