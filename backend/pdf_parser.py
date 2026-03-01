@@ -141,6 +141,29 @@ STATEMENT_KEYS = {
 }
 
 
+def extract_values(lines, keys_dict):
+    """テキスト行から勘定科目名をキーワード辞書で照合し、金額を抽出する。
+
+    各行のスペースを除去した後、数値・カンマ・△を除いた文字列を勘定科目名として扱い、
+    keys_dict のキーワードと完全一致した場合に最初の数値を抽出する。
+    △がある場合はマイナス値として扱う。
+    """
+    result = {}
+    for line in lines:
+        clean = line.replace(" ", "")
+        item_name = re.sub(r"[\d,△]+", "", clean)
+        for field, keywords in keys_dict.items():
+            for keyword in keywords:
+                if keyword == item_name:
+                    amounts = re.findall(r"[\d,]+", line)
+                    if amounts:
+                        value = int(amounts[0].replace(",", ""))
+                        if "△" in clean:
+                            value = value * -1
+                        result[field] = value
+    return result
+
+
 def parse_pdf(file_path):
     """PDF ファイルを解析し、貸借対照表・損益計算書・原価報告書のデータを返す。"""
 
@@ -164,22 +187,6 @@ def parse_pdf(file_path):
 
             if current_section:
                 sections[current_section] += text + "\n"
-
-    def extract_values(lines, keys_dict):
-        result = {}
-        for line in lines:
-            clean = line.replace(" ", "")
-            item_name = re.sub(r"[\d,△]+", "", clean)
-            for field, keywords in keys_dict.items():
-                for keyword in keywords:
-                    if keyword == item_name:
-                        amounts = re.findall(r"[\d,]+", line)
-                        if amounts:
-                            value = int(amounts[0].replace(",", ""))
-                            if "△" in clean:
-                                value = value * -1
-                            result[field] = value
-        return result
 
     bs_result = extract_values(sections["bs"].split("\n"), BALANCE_SHEET_KEYS)
     pl_result = extract_values(sections["pl"].split("\n"), PROFIT_AND_LOSS_KEYS)

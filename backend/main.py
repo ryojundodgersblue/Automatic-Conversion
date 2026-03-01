@@ -15,6 +15,9 @@
 import logging
 import os
 import re
+import time
+import uuid
+from urllib.parse import quote
 
 from excel_writer import write_to_excel
 from fastapi import FastAPI, File, HTTPException, Request, UploadFile
@@ -156,11 +159,7 @@ async def health_check():
     return {"status": "ok"}
 
 
-import time
-
 # --- ダウンロード用一時ストレージ ---
-import uuid
-
 # { download_id: { "path": ..., "filename": ..., "created": ... } }
 _download_store: dict = {}
 DOWNLOAD_EXPIRY = 600  # 10分
@@ -199,9 +198,17 @@ async def upload_pdf(file: UploadFile = File(...)):
             detail=f"ファイルサイズが上限（{MAX_FILE_SIZE // (1024 * 1024)}MB）を超えています",
         )
 
+    # --- バリデーション: PDFマジックバイトチェック（content-type偽装防止） ---
+    if not contents[:5].startswith(b"%PDF-"):
+        raise HTTPException(
+            status_code=400, detail="PDFファイルのみアップロード可能です"
+        )
+
     # --- ファイル名サニタイズ（パストラバーサル防止） ---
     safe_filename = secure_filename(file.filename or "uploaded.pdf")
-    file_path = os.path.join(UPLOAD_DIR, safe_filename)
+    # 同名ファイルの衝突を防止するためUUIDプレフィックスを付与
+    unique_filename = f"{uuid.uuid4().hex}_{safe_filename}"
+    file_path = os.path.join(UPLOAD_DIR, unique_filename)
 
     # --- PDF を一時保存 ---
     with open(file_path, "wb") as buffer:
@@ -246,14 +253,19 @@ async def upload_pdf(file: UploadFile = File(...)):
 async def download_file(download_id: str, dummy_filename: str = None):
     """生成された Excel ファイルをダウンロードする。URLにダミーファイル名を含めることでChrome対策とする。"""
 
+    # download_id の形式を検証（UUID形式のみ許可）
+    try:
+        uuid.UUID(download_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=400, detail="無効なダウンロードIDです"
+        )
+
     info = _download_store.get(download_id)
     if not info or not os.path.exists(info["path"]):
         raise HTTPException(
             status_code=404, detail="ダウンロードファイルが見つかりません"
         )
-
-    import re
-    from urllib.parse import quote
 
     # ASCII用のフォールバックファイル名（非ASCII文字を除去 or 置換）
     ascii_filename = re.sub(r"[^\x00-\x7F]", "_", info["filename"])

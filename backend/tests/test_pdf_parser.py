@@ -9,7 +9,6 @@
 """
 
 import os
-import re
 import sys
 
 import pytest
@@ -22,29 +21,8 @@ from pdf_parser import (
     COST_REPORT_KEYS,
     PROFIT_AND_LOSS_KEYS,
     STATEMENT_KEYS,
+    extract_values,
 )
-
-
-# =============================================
-# extract_values を直接テスト可能にするため、
-# pdf_parser.py の内部関数と同一ロジックを再実装
-# =============================================
-def extract_values(lines, keys_dict):
-    """pdf_parser.py の extract_values と同一ロジック。"""
-    result = {}
-    for line in lines:
-        clean = line.replace(" ", "")
-        item_name = re.sub(r"[\d,△]+", "", clean)
-        for field, keywords in keys_dict.items():
-            for keyword in keywords:
-                if keyword == item_name:
-                    amounts = re.findall(r"[\d,]+", line)
-                    if amounts:
-                        value = int(amounts[0].replace(",", ""))
-                        if "△" in clean:
-                            value = value * -1
-                        result[field] = value
-    return result
 
 
 # =============================================

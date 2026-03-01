@@ -4,10 +4,13 @@
 - ファイルアップロードエンドポイント（正常系・異常系）
 - ファイルサイズ制限（413エラー）
 - ファイル形式バリデーション（400エラー）
+- PDFマジックバイト検証（content-type偽装防止）
 - secure_filename（パストラバーサル防止）
 - セキュリティヘッダーの確認
 - CORS設定の確認
 - グローバル例外ハンドラ
+- ヘルスチェックエンドポイント
+- ダウンロードエンドポイント（正常系・異常系・UUID検証）
 """
 
 import os
@@ -18,7 +21,7 @@ import pytest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from httpx import ASGITransport, AsyncClient
-from main import app, secure_filename
+from main import _download_store, app, secure_filename
 
 
 # =============================================
@@ -193,3 +196,141 @@ class TestCORSConfiguration:
         assert "http://evil.com" not in response.headers.get(
             "access-control-allow-origin", ""
         )
+
+
+# =============================================
+# ヘルスチェックテスト
+# =============================================
+class TestHealthCheck:
+    """ヘルスチェックエンドポイントのテスト。"""
+
+    @pytest.fixture
+    def client(self):
+        transport = ASGITransport(app=app)
+        return AsyncClient(transport=transport, base_url="http://test")
+
+    @pytest.mark.asyncio
+    async def test_health_check_returns_ok(self, client):
+        """GET / は status: ok を返す。"""
+        response = await client.get("/")
+        assert response.status_code == 200
+        assert response.json() == {"status": "ok"}
+
+
+# =============================================
+# PDFマジックバイト検証テスト
+# =============================================
+class TestPDFMagicByteValidation:
+    """content-type偽装防止のためのマジックバイトチェックテスト。"""
+
+    @pytest.fixture
+    def client(self):
+        transport = ASGITransport(app=app)
+        return AsyncClient(transport=transport, base_url="http://test")
+
+    @pytest.mark.asyncio
+    async def test_reject_fake_pdf_content_type(self, client):
+        """content-typeがPDFだが中身がPDFでないファイルは400エラー。"""
+        fake_pdf = b"This is not a PDF file"
+        response = await client.post(
+            "/api/upload",
+            files={"file": ("fake.pdf", fake_pdf, "application/pdf")},
+        )
+        assert response.status_code == 400
+        assert "PDF" in response.json().get("error", "")
+
+    @pytest.mark.asyncio
+    async def test_accept_valid_pdf_magic_bytes(self, client):
+        """正しいPDFマジックバイトを持つファイルはバリデーション通過。"""
+        valid_pdf = b"%PDF-1.4 dummy content"
+        response = await client.post(
+            "/api/upload",
+            files={"file": ("test.pdf", valid_pdf, "application/pdf")},
+        )
+        # マジックバイトチェックは通過（後続のPDF解析でエラーになる可能性あり）
+        assert response.status_code != 400
+
+
+# =============================================
+# ダウンロードエンドポイントテスト
+# =============================================
+class TestDownloadEndpoint:
+    """ダウンロードAPIの正常系・異常系テスト。"""
+
+    @pytest.fixture
+    def client(self):
+        transport = ASGITransport(app=app)
+        return AsyncClient(transport=transport, base_url="http://test")
+
+    @pytest.mark.asyncio
+    async def test_download_invalid_uuid_format(self, client):
+        """UUID形式でないdownload_idは400エラー。"""
+        response = await client.get("/api/download/not-a-uuid")
+        assert response.status_code == 400
+        assert "無効" in response.json().get("error", "")
+
+    @pytest.mark.asyncio
+    async def test_download_nonexistent_id(self, client):
+        """存在しないdownload_idは404エラー。"""
+        import uuid
+
+        fake_id = str(uuid.uuid4())
+        response = await client.get(f"/api/download/{fake_id}")
+        assert response.status_code == 404
+        assert "見つかりません" in response.json().get("error", "")
+
+    @pytest.mark.asyncio
+    async def test_download_valid_file(self, client, tmp_path):
+        """正常なダウンロード: 登録済みファイルをダウンロードできる。"""
+        import time
+        import uuid
+
+        # テスト用の一時ファイルを作成
+        test_file = tmp_path / "test_output.xlsx"
+        test_file.write_bytes(b"dummy excel content")
+
+        # ダウンロードストアに登録
+        download_id = str(uuid.uuid4())
+        _download_store[download_id] = {
+            "path": str(test_file),
+            "filename": "テスト_報告書.xlsx",
+            "created": time.time(),
+        }
+
+        try:
+            response = await client.get(f"/api/download/{download_id}")
+            assert response.status_code == 200
+            assert "attachment" in response.headers.get("content-disposition", "")
+        finally:
+            # テスト後にクリーンアップ
+            _download_store.pop(download_id, None)
+
+    @pytest.mark.asyncio
+    async def test_download_with_dummy_filename(self, client, tmp_path):
+        """ダミーファイル名付きURLでもダウンロードできる（Chrome対策）。"""
+        import time
+        import uuid
+
+        test_file = tmp_path / "test_output.xlsx"
+        test_file.write_bytes(b"dummy excel content")
+
+        download_id = str(uuid.uuid4())
+        _download_store[download_id] = {
+            "path": str(test_file),
+            "filename": "テスト_報告書.xlsx",
+            "created": time.time(),
+        }
+
+        try:
+            response = await client.get(
+                f"/api/download/{download_id}/テスト_報告書.xlsx"
+            )
+            assert response.status_code == 200
+        finally:
+            _download_store.pop(download_id, None)
+
+    @pytest.mark.asyncio
+    async def test_download_path_traversal_in_id(self, client):
+        """download_idにパストラバーサルを試行しても400エラー。"""
+        response = await client.get("/api/download/../../../etc/passwd")
+        assert response.status_code == 400

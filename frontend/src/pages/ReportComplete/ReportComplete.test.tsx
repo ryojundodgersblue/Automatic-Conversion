@@ -16,15 +16,13 @@ import ReportComplete from "./ReportComplete";
 
 // --- fetch モック用ヘルパー ---
 function mockFetchSuccess() {
-  const blob = new Blob(["dummy excel data"], {
-    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  });
   return vi.fn().mockResolvedValue({
     ok: true,
-    blob: () => Promise.resolve(blob),
-    headers: new Headers({
-      "content-disposition": "attachment; filename*=UTF-8''test_%E5%A0%B1%E5%91%8A%E6%9B%B8.xlsx",
-    }),
+    json: () =>
+      Promise.resolve({
+        download_id: "test-uuid-1234",
+        filename: "test_報告書.xlsx",
+      }),
   });
 }
 
@@ -32,7 +30,7 @@ function mockFetchError(status: number) {
   return vi.fn().mockResolvedValue({
     ok: false,
     status,
-    json: () => Promise.resolve({ error: "エラーメッセージ" }),
+    text: () => Promise.resolve("エラーメッセージ"),
   });
 }
 
@@ -253,6 +251,121 @@ describe("ReportComplete", () => {
       await waitFor(() => {
         // エラーメッセージが表示されないことを確認
         expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+      });
+    });
+
+    it("アップロード成功時にダウンロードボタンが表示される", async () => {
+      global.fetch = mockFetchSuccess();
+
+      render(<ReportComplete />);
+
+      const smallFile = new File(["dummy"], "test.pdf", {
+        type: "application/pdf",
+      });
+      Object.defineProperty(smallFile, "size", { value: 1024 });
+      const input = document.querySelector(
+        'input[type="file"]',
+      ) as HTMLInputElement;
+      fireEvent.change(input, { target: { files: [smallFile] } });
+
+      await waitFor(() => {
+        expect(
+          screen.getByText("Excelファイルをダウンロード"),
+        ).toBeInTheDocument();
+      });
+    });
+
+    it("アップロード成功時にファイル名が表示される", async () => {
+      global.fetch = mockFetchSuccess();
+
+      render(<ReportComplete />);
+
+      const smallFile = new File(["dummy"], "test.pdf", {
+        type: "application/pdf",
+      });
+      Object.defineProperty(smallFile, "size", { value: 1024 });
+      const input = document.querySelector(
+        'input[type="file"]',
+      ) as HTMLInputElement;
+      fireEvent.change(input, { target: { files: [smallFile] } });
+
+      await waitFor(() => {
+        expect(screen.getByText("test_報告書.xlsx")).toBeInTheDocument();
+      });
+    });
+
+    it("アップロード成功後に「別のPDFを変換する」ボタンが表示される", async () => {
+      global.fetch = mockFetchSuccess();
+
+      render(<ReportComplete />);
+
+      const smallFile = new File(["dummy"], "test.pdf", {
+        type: "application/pdf",
+      });
+      Object.defineProperty(smallFile, "size", { value: 1024 });
+      const input = document.querySelector(
+        'input[type="file"]',
+      ) as HTMLInputElement;
+      fireEvent.change(input, { target: { files: [smallFile] } });
+
+      await waitFor(() => {
+        expect(screen.getByText("別のPDFを変換する")).toBeInTheDocument();
+      });
+    });
+
+    it("「別のPDFを変換する」ボタンで初期状態に戻る", async () => {
+      global.fetch = mockFetchSuccess();
+
+      render(<ReportComplete />);
+
+      const smallFile = new File(["dummy"], "test.pdf", {
+        type: "application/pdf",
+      });
+      Object.defineProperty(smallFile, "size", { value: 1024 });
+      const input = document.querySelector(
+        'input[type="file"]',
+      ) as HTMLInputElement;
+      fireEvent.change(input, { target: { files: [smallFile] } });
+
+      await waitFor(() => {
+        expect(screen.getByText("別のPDFを変換する")).toBeInTheDocument();
+      });
+
+      // リセットボタンをクリック
+      fireEvent.click(screen.getByText("別のPDFを変換する"));
+
+      await waitFor(() => {
+        // PDFファイルを選択ボタンが再表示される
+        expect(screen.getByText("PDFファイルを選択")).toBeInTheDocument();
+        // ダウンロードボタンは消える
+        expect(
+          screen.queryByText("Excelファイルをダウンロード"),
+        ).not.toBeInTheDocument();
+      });
+    });
+  });
+
+  // =============================================
+  // エラーコード網羅
+  // =============================================
+  describe("エラーコード網羅", () => {
+    it("未知のステータスコードで汎用エラーメッセージが表示される", async () => {
+      global.fetch = mockFetchError(418);
+      render(<ReportComplete />);
+
+      const smallFile = new File(["dummy"], "test.pdf", {
+        type: "application/pdf",
+      });
+      Object.defineProperty(smallFile, "size", { value: 1024 });
+      const input = document.querySelector(
+        'input[type="file"]',
+      ) as HTMLInputElement;
+      fireEvent.change(input, { target: { files: [smallFile] } });
+
+      await waitFor(() => {
+        expect(screen.getByRole("alert")).toHaveTextContent(
+          "予期しないエラーが発生しました",
+        );
       });
     });
   });
