@@ -24,7 +24,6 @@ function getErrorMessage(status: number): string {
 
 function ReportComplete() {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -42,13 +41,11 @@ function ReportComplete() {
     // --- フロントエンド側サイズチェック（10MB制限） ---
     if (file.size > MAX_FILE_SIZE) {
       setErrorMessage("ファイルサイズが上限（10MB）を超えています。");
-      setSelectedFile(null);
       // input をリセット
       if (fileInputRef.current) fileInputRef.current.value = "";
       return;
     }
 
-    setSelectedFile(file);
     setErrorMessage(null);
 
     // バックエンドにファイルをアップロード
@@ -81,23 +78,19 @@ function ReportComplete() {
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement("a");
 
-        // ファイル名をレスポンスヘッダーから取得、なければデフォルト名
-        const disposition = response.headers.get("content-disposition");
-        let filename = "報告書.xlsx";
-        if (disposition) {
-          const match = disposition.match(/filename\*?=(?:UTF-8'')?([^;]+)/);
-          if (match && match[1]) {
-            filename = decodeURIComponent(match[1].replace(/"/g, ""));
-          }
-        }
+        // ダウンロードファイル名: 元のPDF名 → _報告書.xlsx
+        const baseName = file.name.replace(/\.pdf$/i, "");
+        const downloadName = `${baseName}_報告書.xlsx`;
 
         a.href = url;
-        a.download = filename;
+        a.download = downloadName;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
         window.URL.revokeObjectURL(url);
 
+        // アップロード完了後、inputを初期状態に戻す
+        if (fileInputRef.current) fileInputRef.current.value = "";
         setErrorMessage(null);
       } else {
         // --- ステータスコード別エラーメッセージ ---
@@ -155,11 +148,7 @@ function ReportComplete() {
           onClick={handleClick}
           disabled={isUploading}
         >
-          {isUploading
-            ? "変換中..."
-            : selectedFile
-              ? selectedFile.name
-              : "PDFファイルを選択"}
+          {isUploading ? "変換中..." : "PDFファイルを選択"}
         </button>
 
         {/* エラーメッセージ表示 */}
