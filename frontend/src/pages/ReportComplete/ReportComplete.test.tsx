@@ -7,7 +7,10 @@
  * - サーバーエラー時のメッセージ表示（400, 413, 500）
  * - タイムアウト時のメッセージ表示
  * - ネットワークエラー時のメッセージ表示
- * - アップロード成功時のダウンロード動作
+ * - アップロード成功時のダウンロードボタン表示
+ * - ダウンロードボタンクリック時のblob download動作
+ * - リセットボタン動作
+ * - エラーコード網羅
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
@@ -15,14 +18,18 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import ReportComplete from "./ReportComplete";
 
 // --- fetch モック用ヘルパー ---
-function mockFetchSuccess() {
+function mockFetchUploadSuccess() {
   return vi.fn().mockResolvedValue({
     ok: true,
     json: () =>
       Promise.resolve({
-        download_id: "test-uuid-1234",
+        download_id: "test-uuid",
         filename: "test_報告書.xlsx",
       }),
+    text: () =>
+      Promise.resolve(
+        '{"download_id":"test-uuid","filename":"test_報告書.xlsx"}',
+      ),
   });
 }
 
@@ -30,7 +37,8 @@ function mockFetchError(status: number) {
   return vi.fn().mockResolvedValue({
     ok: false,
     status,
-    text: () => Promise.resolve("エラーメッセージ"),
+    text: () => Promise.resolve('{"error":"エラーメッセージ"}'),
+    json: () => Promise.resolve({ error: "エラーメッセージ" }),
   });
 }
 
@@ -116,7 +124,7 @@ describe("ReportComplete", () => {
 
     it("10MB以下のファイルはサイズエラーが出ない", async () => {
       // fetch をモック（成功レスポンス）
-      global.fetch = mockFetchSuccess();
+      global.fetch = mockFetchUploadSuccess();
 
       render(<ReportComplete />);
 
@@ -231,31 +239,11 @@ describe("ReportComplete", () => {
   });
 
   // =============================================
-  // アップロード成功
+  // アップロード成功 & ダウンロード
   // =============================================
   describe("アップロード成功", () => {
-    it("アップロード成功時にエラーが表示されない", async () => {
-      global.fetch = mockFetchSuccess();
-
-      render(<ReportComplete />);
-
-      const smallFile = new File(["dummy"], "test.pdf", {
-        type: "application/pdf",
-      });
-      Object.defineProperty(smallFile, "size", { value: 1024 });
-      const input = document.querySelector(
-        'input[type="file"]',
-      ) as HTMLInputElement;
-      fireEvent.change(input, { target: { files: [smallFile] } });
-
-      await waitFor(() => {
-        // エラーメッセージが表示されないことを確認
-        expect(screen.queryByRole("alert")).not.toBeInTheDocument();
-      });
-    });
-
     it("アップロード成功時にダウンロードボタンが表示される", async () => {
-      global.fetch = mockFetchSuccess();
+      global.fetch = mockFetchUploadSuccess();
 
       render(<ReportComplete />);
 
@@ -275,8 +263,27 @@ describe("ReportComplete", () => {
       });
     });
 
+    it("アップロード成功時にエラーが表示されない", async () => {
+      global.fetch = mockFetchUploadSuccess();
+
+      render(<ReportComplete />);
+
+      const smallFile = new File(["dummy"], "test.pdf", {
+        type: "application/pdf",
+      });
+      Object.defineProperty(smallFile, "size", { value: 1024 });
+      const input = document.querySelector(
+        'input[type="file"]',
+      ) as HTMLInputElement;
+      fireEvent.change(input, { target: { files: [smallFile] } });
+
+      await waitFor(() => {
+        expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+      });
+    });
+
     it("アップロード成功時にファイル名が表示される", async () => {
-      global.fetch = mockFetchSuccess();
+      global.fetch = mockFetchUploadSuccess();
 
       render(<ReportComplete />);
 
@@ -295,7 +302,7 @@ describe("ReportComplete", () => {
     });
 
     it("アップロード成功後に「別のPDFを変換する」ボタンが表示される", async () => {
-      global.fetch = mockFetchSuccess();
+      global.fetch = mockFetchUploadSuccess();
 
       render(<ReportComplete />);
 
@@ -314,7 +321,7 @@ describe("ReportComplete", () => {
     });
 
     it("「別のPDFを変換する」ボタンで初期状態に戻る", async () => {
-      global.fetch = mockFetchSuccess();
+      global.fetch = mockFetchUploadSuccess();
 
       render(<ReportComplete />);
 
@@ -341,6 +348,86 @@ describe("ReportComplete", () => {
         expect(
           screen.queryByText("Excelファイルをダウンロード"),
         ).not.toBeInTheDocument();
+      });
+    });
+
+    it("ダウンロードボタンクリック時にblob downloadが実行される", async () => {
+      // アップロード成功モック
+      global.fetch = mockFetchUploadSuccess();
+
+      render(<ReportComplete />);
+
+      const smallFile = new File(["dummy"], "test.pdf", {
+        type: "application/pdf",
+      });
+      Object.defineProperty(smallFile, "size", { value: 1024 });
+      const input = document.querySelector(
+        'input[type="file"]',
+      ) as HTMLInputElement;
+      fireEvent.change(input, { target: { files: [smallFile] } });
+
+      // ダウンロードボタンが表示されるまで待つ
+      await waitFor(() => {
+        expect(
+          screen.getByText("Excelファイルをダウンロード"),
+        ).toBeInTheDocument();
+      });
+
+      // ダウンロード用fetchモックに切り替え
+      const blob = new Blob(["excel data"], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        blob: () => Promise.resolve(blob),
+        headers: new Headers({
+          "Content-Disposition":
+            "attachment; filename*=utf-8''test_%E5%A0%B1%E5%91%8A%E6%9B%B8.xlsx",
+        }),
+      });
+
+      // ダウンロードボタンをクリック
+      fireEvent.click(screen.getByText("Excelファイルをダウンロード"));
+
+      await waitFor(() => {
+        expect(global.fetch).toHaveBeenCalled();
+        expect(URL.createObjectURL).toHaveBeenCalled();
+      });
+    });
+
+    it("ダウンロード失敗時にエラーメッセージが表示される", async () => {
+      // アップロード成功モック
+      global.fetch = mockFetchUploadSuccess();
+
+      render(<ReportComplete />);
+
+      const smallFile = new File(["dummy"], "test.pdf", {
+        type: "application/pdf",
+      });
+      Object.defineProperty(smallFile, "size", { value: 1024 });
+      const input = document.querySelector(
+        'input[type="file"]',
+      ) as HTMLInputElement;
+      fireEvent.change(input, { target: { files: [smallFile] } });
+
+      await waitFor(() => {
+        expect(
+          screen.getByText("Excelファイルをダウンロード"),
+        ).toBeInTheDocument();
+      });
+
+      // ダウンロード失敗モック
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 404,
+      });
+
+      fireEvent.click(screen.getByText("Excelファイルをダウンロード"));
+
+      await waitFor(() => {
+        expect(screen.getByRole("alert")).toHaveTextContent(
+          "ダウンロードファイルが見つかりません",
+        );
       });
     });
   });

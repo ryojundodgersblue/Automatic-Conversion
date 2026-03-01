@@ -80,17 +80,23 @@
 .download-btn {
   background: #2e7d32;
   color: white;
-  text-decoration: none;
+  border: none;
   border-radius: 999px;
   padding: 1rem 3rem;
   font-size: 1.125rem;
   font-weight: bold;
   display: inline-block;
+  cursor: pointer;
   transition: background 0.2s;
 }
 
 .download-btn:hover {
   background: #1b5e20;
+}
+
+.download-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .reset-btn {
