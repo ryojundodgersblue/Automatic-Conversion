@@ -1,5 +1,5 @@
 {
   "rewrites": [
-    { "source": "/api/:path*", "destination": "https://RENDER_URL_HERE/api/:path*" }
+    { "source": "/api/:path*", "destination": "https://https://automatic-conversion-api.onrender.com/api/:path*" }
   ]
 }
