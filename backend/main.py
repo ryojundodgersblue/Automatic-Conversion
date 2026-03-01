@@ -251,9 +251,23 @@ async def download_file(download_id: str):
             status_code=404, detail="ダウンロードファイルが見つかりません"
         )
 
+    import re
+    from urllib.parse import quote
+
+    # ASCII用のフォールバックファイル名（非ASCII文字を除去 or 置換）
+    ascii_filename = re.sub(r"[^\x00-\x7F]", "_", info["filename"])
+
+    # RFC 6266 準拠：filename= と filename*= の両方を設定
+    encoded_filename = quote(info["filename"], encoding="utf-8")
+    content_disposition = (
+        f"attachment; "
+        f'filename="{ascii_filename}"; '
+        f"filename*=utf-8''{encoded_filename}"
+    )
+
     return FileResponse(
         path=info["path"],
-        filename=info["filename"],
+        headers={"Content-Disposition": content_disposition},
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     )
 
