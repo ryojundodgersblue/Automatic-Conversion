@@ -88,6 +88,7 @@ app.add_middleware(
     allow_methods=["POST", "GET"],
     allow_headers=["Content-Type"],
     allow_credentials=True,
+    expose_headers=["Content-Disposition"],
     max_age=600,  # プリフライトキャッシュ10分
 )
 
