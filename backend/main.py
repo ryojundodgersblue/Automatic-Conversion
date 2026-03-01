@@ -150,6 +150,12 @@ def secure_filename(filename: str) -> str:
 # =============================================
 
 
+@app.get("/")
+async def health_check():
+    """Renderのヘルスチェック用エンドポイント"""
+    return {"status": "ok"}
+
+
 import time
 
 # --- ダウンロード用一時ストレージ ---
