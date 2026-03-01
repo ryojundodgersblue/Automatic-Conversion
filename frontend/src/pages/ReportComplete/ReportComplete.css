@@ -57,3 +57,14 @@
   margin-bottom: 2rem;
 }
 
+.error-message {
+  /* エラーメッセージ表示 */
+  color: #d32f2f;
+  background: #ffeaea;
+  border: 1px solid #f5c6cb;
+  border-radius: 8px;
+  padding: 0.75rem 1.25rem;
+  margin-bottom: 1rem;
+  font-size: 0.9rem;
+  font-weight: 500;
+}

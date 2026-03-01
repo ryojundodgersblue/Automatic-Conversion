@@ -169,7 +169,7 @@ def parse_pdf(file_path):
         result = {}
         for line in lines:
             clean = line.replace(" ", "")
-            item_name = re.sub(r"[\d,]+", "", clean)
+            item_name = re.sub(r"[\d,△]+", "", clean)
             for field, keywords in keys_dict.items():
                 for keyword in keywords:
                     if keyword == item_name:
