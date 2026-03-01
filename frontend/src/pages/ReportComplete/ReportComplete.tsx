@@ -5,6 +5,8 @@ import "./ReportComplete.css";
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 /** アップロードタイムアウト（180秒 — Render Free プランのコールドスタート対応） */
 const UPLOAD_TIMEOUT_MS = 180_000;
+/** API Base URL: 開発時は空文字（Viteプロキシ使用）、本番時はRenderのURL */
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "";
 
 /**
  * エラーメッセージをHTTPステータスコードに応じて返す
@@ -25,6 +27,7 @@ function getErrorMessage(status: number): string {
 function ReportComplete() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [downloadInfo, setDownloadInfo] = useState<{
     id: string;
@@ -67,7 +70,7 @@ function ReportComplete() {
       const formData = new FormData();
       formData.append("file", file);
 
-      const response = await fetch("/api/upload", {
+      const response = await fetch(`${API_BASE_URL}/api/upload`, {
         method: "POST",
         body: formData,
         signal: controller.signal,
@@ -115,6 +118,49 @@ function ReportComplete() {
     }
   };
 
+  const handleDownload = async () => {
+    if (!downloadInfo) return;
+
+    setIsDownloading(true);
+    setErrorMessage(null);
+
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/download/${downloadInfo.id}/${encodeURIComponent(downloadInfo.name)}`,
+      );
+
+      if (!response.ok) {
+        if (response.status === 404) {
+          setErrorMessage(
+            "ダウンロードファイルが見つかりません。再度変換してください。",
+          );
+        } else {
+          setErrorMessage(
+            "ダウンロード中にエラーが発生しました。再度お試しください。",
+          );
+        }
+        return;
+      }
+
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = downloadInfo.name;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("ダウンロードエラー:", error);
+      setErrorMessage(
+        "ファイルのダウンロード中にエラーが発生しました。",
+      );
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
   return (
     <div className="report-complete">
       <div className="card">
@@ -137,17 +183,18 @@ function ReportComplete() {
         {/* 変換完了時はダウンロードボタンを表示、それ以外はファイル選択ボタン */}
         {downloadInfo ? (
           <div className="download-actions">
-            <a
-              href={`/api/download/${downloadInfo.id}/${encodeURIComponent(downloadInfo.name)}`}
-              download={downloadInfo.name}
+            <button
               className="download-btn"
+              onClick={handleDownload}
+              disabled={isDownloading}
             >
-              Excelファイルをダウンロード
-            </a>
+              {isDownloading ? "ダウンロード中..." : "Excelファイルをダウンロード"}
+            </button>
             <p className="filename-text">{downloadInfo.name}</p>
             <button
               className="reset-btn"
               onClick={() => setDownloadInfo(null)}
+              disabled={isDownloading}
             >
               別のPDFを変換する
             </button>

@@ -1,6 +1,1 @@
-{
-  "rewrites": [
-    { "source": "/api/upload", "destination": "https://automatic-conversion-api.onrender.com/api/upload" },
-    { "source": "/api/download/:path*", "destination": "https://automatic-conversion-api.onrender.com/api/download/:path*" }
-  ]
-}
+{}
