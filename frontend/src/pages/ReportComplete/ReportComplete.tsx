@@ -87,19 +87,25 @@ function ReportComplete() {
         const baseName = file.name.replace(/\.pdf$/i, "");
         const downloadName = `${baseName}_報告書.xlsx`;
 
-        // ダウンロード実行
+        // ダウンロード実行（MouseEvent で確実にダウンロード属性を反映）
         const url = window.URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = downloadName;
-        a.style.display = "none";
-        document.body.appendChild(a);
-        a.click();
+        const link = document.createElement("a");
+        link.setAttribute("href", url);
+        link.setAttribute("download", downloadName);
+        link.style.cssText = "display:none;position:fixed;top:0;left:0;";
+        document.body.appendChild(link);
+
+        const event = new MouseEvent("click", {
+          view: window,
+          bubbles: true,
+          cancelable: false,
+        });
+        link.dispatchEvent(event);
 
         setTimeout(() => {
-          document.body.removeChild(a);
+          document.body.removeChild(link);
           window.URL.revokeObjectURL(url);
-        }, 3000);
+        }, 5000);
 
         console.log("ダウンロード開始:", downloadName);
 
