@@ -242,8 +242,9 @@ async def upload_pdf(file: UploadFile = File(...)):
 
 
 @app.get("/api/download/{download_id}")
-async def download_file(download_id: str):
-    """生成された Excel ファイルをダウンロードする。"""
+@app.get("/api/download/{download_id}/{dummy_filename}")
+async def download_file(download_id: str, dummy_filename: str = None):
+    """生成された Excel ファイルをダウンロードする。URLにダミーファイル名を含めることでChrome対策とする。"""
 
     info = _download_store.get(download_id)
     if not info or not os.path.exists(info["path"]):

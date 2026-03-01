@@ -115,34 +115,6 @@ function ReportComplete() {
     }
   };
 
-  const handleDownload = async () => {
-    if (!downloadInfo) return;
-    
-    try {
-      // 解決策③：Blob URLダウンロード方式（Chrome対策）
-      // 一度fetchで取得してからBlob URLにするため、Content-Dispositionに依存せず
-      // a.download 属性のファイル名が100%確実に適用される
-      const response = await fetch(`/api/download/${downloadInfo.id}`);
-      if (!response.ok) throw new Error("ダウンロードに失敗しました");
-      
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = downloadInfo.name;
-      document.body.appendChild(a);
-      a.click();
-      
-      setTimeout(() => {
-        document.body.removeChild(a);
-        window.URL.revokeObjectURL(url);
-      }, 1000);
-    } catch (error) {
-      console.error("ダウンロードエラー:", error);
-      setErrorMessage("ファイルのダウンロードに失敗しました。");
-    }
-  };
-
   return (
     <div className="report-complete">
       <div className="card">
@@ -165,9 +137,13 @@ function ReportComplete() {
         {/* 変換完了時はダウンロードボタンを表示、それ以外はファイル選択ボタン */}
         {downloadInfo ? (
           <div className="download-actions">
-            <button onClick={handleDownload} className="download-btn">
+            <a
+              href={`/api/download/${downloadInfo.id}/${encodeURIComponent(downloadInfo.name)}`}
+              download={downloadInfo.name}
+              className="download-btn"
+            >
               Excelファイルをダウンロード
-            </button>
+            </a>
             <p className="filename-text">{downloadInfo.name}</p>
             <button
               className="reset-btn"
