@@ -3,8 +3,8 @@ import "./ReportComplete.css";
 
 /** PDFアップロードサイズ上限（10MB） */
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
-/** アップロードタイムアウト（60秒） */
-const UPLOAD_TIMEOUT_MS = 60_000;
+/** アップロードタイムアウト（180秒 — Render Free プランのコールドスタート対応） */
+const UPLOAD_TIMEOUT_MS = 180_000;
 
 /**
  * エラーメッセージをHTTPステータスコードに応じて返す
@@ -169,7 +169,7 @@ function ReportComplete() {
           </p>
         )}
 
-        <p className="note">処理時間: 約10〜30秒 ｜ ファイルサイズ上限: 10MB</p>
+        <p className="note">処理時間: 約1〜3分（初回アクセス時は時間がかかります） ｜ ファイルサイズ上限: 10MB</p>
       </div>
     </div>
   );
