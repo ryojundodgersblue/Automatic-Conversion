@@ -77,7 +77,19 @@ function ReportComplete() {
         const downloadId = data.download_id;
 
         // ブラウザのネイティブダウンロードを使用（Content-Dispositionで正しいファイル名）
-        window.location.href = `/api/download/${downloadId}`;
+        const downloadUrl = `/api/download/${downloadId}`;
+        const a = document.createElement("a");
+        a.href = downloadUrl;
+        a.style.display = "none";
+        document.body.appendChild(a);
+        a.click();
+        
+        // クリーンアップ
+        setTimeout(() => {
+          if (document.body.contains(a)) {
+            document.body.removeChild(a);
+          }
+        }, 3000);
 
         if (fileInputRef.current) fileInputRef.current.value = "";
         setErrorMessage(null);
