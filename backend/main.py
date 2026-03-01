@@ -150,9 +150,34 @@ def secure_filename(filename: str) -> str:
 # =============================================
 
 
+import time
+
+# --- ダウンロード用一時ストレージ ---
+import uuid
+
+# { download_id: { "path": ..., "filename": ..., "created": ... } }
+_download_store: dict = {}
+DOWNLOAD_EXPIRY = 600  # 10分
+
+
+def _cleanup_expired():
+    """期限切れのダウンロードファイルを削除。"""
+    now = time.time()
+    expired = [
+        k for k, v in _download_store.items() if now - v["created"] > DOWNLOAD_EXPIRY
+    ]
+    for k in expired:
+        info = _download_store.pop(k, None)
+        if info and os.path.exists(info["path"]):
+            os.remove(info["path"])
+
+
 @app.post("/api/upload")
 async def upload_pdf(file: UploadFile = File(...)):
-    """PDF を受け取り、Excel に変換してダウンロードさせる。"""
+    """PDF を受け取り、Excel に変換してダウンロードIDを返す。"""
+
+    # --- 期限切れファイルのクリーンアップ ---
+    _cleanup_expired()
 
     # --- バリデーション: ファイル形式チェック ---
     if file.content_type != "application/pdf":
@@ -187,11 +212,15 @@ async def upload_pdf(file: UploadFile = File(...)):
         base_name = os.path.splitext(safe_filename)[0]
         download_name = f"{base_name}_報告書.xlsx"
 
-        return FileResponse(
-            path=output_path,
-            filename=download_name,
-            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        )
+        # ダウンロードIDを発行して一時保存
+        download_id = str(uuid.uuid4())
+        _download_store[download_id] = {
+            "path": output_path,
+            "filename": download_name,
+            "created": time.time(),
+        }
+
+        return {"download_id": download_id, "filename": download_name}
 
     except Exception as e:
         logger.error("PDF処理中にエラーが発生しました: %s", e, exc_info=True)
@@ -204,6 +233,23 @@ async def upload_pdf(file: UploadFile = File(...)):
         # アップロードされた PDF を削除
         if os.path.exists(file_path):
             os.remove(file_path)
+
+
+@app.get("/api/download/{download_id}")
+async def download_file(download_id: str):
+    """生成された Excel ファイルをダウンロードする。"""
+
+    info = _download_store.get(download_id)
+    if not info or not os.path.exists(info["path"]):
+        raise HTTPException(
+            status_code=404, detail="ダウンロードファイルが見つかりません"
+        )
+
+    return FileResponse(
+        path=info["path"],
+        filename=info["filename"],
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
 
 
 if __name__ == "__main__":
