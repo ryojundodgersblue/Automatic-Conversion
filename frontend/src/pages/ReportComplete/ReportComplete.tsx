@@ -74,20 +74,28 @@ function ReportComplete() {
 
       if (response.ok) {
         // レスポンスをBlobとして取得し、Excelをダウンロード
-        const blob = await response.blob();
+        const data = await response.blob();
+        const blob = new Blob([data], {
+          type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        });
         const url = window.URL.createObjectURL(blob);
-        const a = document.createElement("a");
 
         // ダウンロードファイル名: 元のPDF名 → _報告書.xlsx
         const baseName = file.name.replace(/\.pdf$/i, "");
         const downloadName = `${baseName}_報告書.xlsx`;
 
+        const a = document.createElement("a");
         a.href = url;
         a.download = downloadName;
+        a.style.display = "none";
         document.body.appendChild(a);
         a.click();
-        document.body.removeChild(a);
-        window.URL.revokeObjectURL(url);
+
+        // ブラウザがダウンロードを開始するまで少し待ってからクリーンアップ
+        setTimeout(() => {
+          document.body.removeChild(a);
+          window.URL.revokeObjectURL(url);
+        }, 1000);
 
         // アップロード完了後、inputを初期状態に戻す
         if (fileInputRef.current) fileInputRef.current.value = "";
