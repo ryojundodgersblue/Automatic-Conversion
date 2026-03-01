@@ -63,8 +63,6 @@ function ReportComplete() {
       const formData = new FormData();
       formData.append("file", file);
 
-      console.log("アップロード開始:", file.name, file.size, "bytes");
-
       const response = await fetch("/api/upload", {
         method: "POST",
         body: formData,
@@ -72,42 +70,14 @@ function ReportComplete() {
       });
 
       clearTimeout(timeoutId);
-      console.log("レスポンス:", response.status, response.headers.get("content-type"));
 
       if (response.ok) {
-        const blob = await response.blob();
-        console.log("Blob取得:", blob.size, "bytes, type:", blob.type);
+        // サーバーからダウンロードIDを取得
+        const data = await response.json();
+        const downloadId = data.download_id;
 
-        if (blob.size === 0) {
-          setErrorMessage("サーバーからの応答が空です。再度お試しください。");
-          return;
-        }
-
-        // ダウンロードファイル名: 元のPDF名 → _報告書.xlsx
-        const baseName = file.name.replace(/\.pdf$/i, "");
-        const downloadName = `${baseName}_報告書.xlsx`;
-
-        // ダウンロード実行（MouseEvent で確実にダウンロード属性を反映）
-        const url = window.URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.setAttribute("href", url);
-        link.setAttribute("download", downloadName);
-        link.style.cssText = "display:none;position:fixed;top:0;left:0;";
-        document.body.appendChild(link);
-
-        const event = new MouseEvent("click", {
-          view: window,
-          bubbles: true,
-          cancelable: false,
-        });
-        link.dispatchEvent(event);
-
-        setTimeout(() => {
-          document.body.removeChild(link);
-          window.URL.revokeObjectURL(url);
-        }, 5000);
-
-        console.log("ダウンロード開始:", downloadName);
+        // ブラウザのネイティブダウンロードを使用（Content-Dispositionで正しいファイル名）
+        window.location.href = `/api/download/${downloadId}`;
 
         if (fileInputRef.current) fileInputRef.current.value = "";
         setErrorMessage(null);
