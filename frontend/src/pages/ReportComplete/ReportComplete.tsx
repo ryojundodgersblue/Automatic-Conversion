@@ -26,6 +26,10 @@ function ReportComplete() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [downloadInfo, setDownloadInfo] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
 
   const handleClick = () => {
     // ファイル選択ダイアログを開く
@@ -72,24 +76,14 @@ function ReportComplete() {
       clearTimeout(timeoutId);
 
       if (response.ok) {
-        // サーバーからダウンロードIDを取得
         const data = await response.json();
         const downloadId = data.download_id;
 
-        // ブラウザのネイティブダウンロードを使用（Content-Dispositionで正しいファイル名）
-        const downloadUrl = `/api/download/${downloadId}`;
-        const a = document.createElement("a");
-        a.href = downloadUrl;
-        a.style.display = "none";
-        document.body.appendChild(a);
-        a.click();
-        
-        // クリーンアップ
-        setTimeout(() => {
-          if (document.body.contains(a)) {
-            document.body.removeChild(a);
-          }
-        }, 3000);
+        const baseName = file.name.replace(/\.pdf$/i, "");
+        const downloadName = `${baseName}_報告書.xlsx`;
+
+        // 自動ダウンロードをやめ、画面に「ダウンロード」ボタンを表示する状態へと移行
+        setDownloadInfo({ id: downloadId, name: downloadName });
 
         if (fileInputRef.current) fileInputRef.current.value = "";
         setErrorMessage(null);
@@ -140,13 +134,33 @@ function ReportComplete() {
           style={{ display: "none" }}
         />
 
-        <button
-          className="select-btn"
-          onClick={handleClick}
-          disabled={isUploading}
-        >
-          {isUploading ? "変換中..." : "PDFファイルを選択"}
-        </button>
+        {/* 変換完了時はダウンロードボタンを表示、それ以外はファイル選択ボタン */}
+        {downloadInfo ? (
+          <div className="download-actions">
+            <a
+              href={`/api/download/${downloadInfo.id}`}
+              download={downloadInfo.name}
+              className="download-btn"
+            >
+              Excelファイルをダウンロード
+            </a>
+            <p className="filename-text">{downloadInfo.name}</p>
+            <button
+              className="reset-btn"
+              onClick={() => setDownloadInfo(null)}
+            >
+              別のPDFを変換する
+            </button>
+          </div>
+        ) : (
+          <button
+            className="select-btn"
+            onClick={handleClick}
+            disabled={isUploading}
+          >
+            {isUploading ? "変換中..." : "PDFファイルを選択"}
+          </button>
+        )}
 
         {/* エラーメッセージ表示 */}
         {errorMessage && (

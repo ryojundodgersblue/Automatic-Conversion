@@ -68,3 +68,48 @@
   font-size: 0.9rem;
   font-weight: 500;
 }
+
+.download-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.download-btn {
+  background: #2e7d32;
+  color: white;
+  text-decoration: none;
+  border-radius: 999px;
+  padding: 1rem 3rem;
+  font-size: 1.125rem;
+  font-weight: bold;
+  display: inline-block;
+  transition: background 0.2s;
+}
+
+.download-btn:hover {
+  background: #1b5e20;
+}
+
+.reset-btn {
+  background: #f5f5f5;
+  color: #333;
+  border: 1px solid #ddd;
+  border-radius: 999px;
+  padding: 0.75rem 2rem;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.reset-btn:hover {
+  background: #e0e0e0;
+}
+
+.filename-text {
+  font-size: 0.9rem;
+  color: #555;
+  margin: 0;
+}
